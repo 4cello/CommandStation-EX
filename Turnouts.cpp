@@ -479,6 +479,93 @@
 
 
 /*************************************************************************************
+ * DualVpinTurnout - Turnout controlled through two HAL vpins, one for "close" and
+ *    one for "throw". To change the state, the corresponding pin is pulsed for a
+ *    short time, according to DUAL_TURNOUT_PULSE
+ *************************************************************************************/
+
+  // Constructor
+  DualVpinTurnout::DualVpinTurnout(uint16_t id, VPIN vpin_close, VPIN vpin_throw, bool closed) :
+    Turnout(id, TURNOUT_VPIN, closed)
+  {
+    _dualVpinTurnoutData.vpin_close = vpin_close;
+    _dualVpinTurnoutData.vpin_throw = vpin_throw;
+  }
+
+  // Create function
+  /* static */ Turnout *DualVpinTurnout::create(uint16_t id, VPIN vpin_close, VPIN vpin_throw, bool closed) {
+    Turnout *tt = get(id);
+    if (tt) { 
+      // Object already exists, check if it is usable
+      if (tt->isType(TURNOUT_VPIN)) {
+        // Yes, so set parameters
+        DualVpinTurnout *vt = (DualVpinTurnout *)tt;
+        vt->_dualVpinTurnoutData.vpin_close = vpin_close;
+        vt->_dualVpinTurnoutData.vpin_throw = vpin_throw;
+        // Don't touch the _closed parameter, retain the original value.
+        return tt;
+      } else {
+        // Incompatible object, delete and recreate
+        remove(id);
+      }
+    }
+    tt = (Turnout *)new DualVpinTurnout(id, vpin_close, vpin_throw, closed);
+    return tt;
+  }
+
+  // Load a VPIN turnout definition from EEPROM.  The common Turnout data has already been read at this point.
+  /* static */ Turnout *DualVpinTurnout::load(struct TurnoutData *turnoutData) {
+#ifndef DISABLE_EEPROM
+    DualVpinTurnoutData vpinTurnoutData;
+    // Read class-specific data from EEPROM
+    EEPROM.get(EEStore::pointer(), vpinTurnoutData);
+    EEStore::advance(sizeof(vpinTurnoutData));
+    
+    // Create new object
+    DualVpinTurnout *tt = new DualVpinTurnout(turnoutData->id, vpinTurnoutData.vpin_close, vpinTurnoutData.vpin_throw, turnoutData->closed);
+
+    return tt;
+#else
+    (void)turnoutData;
+    return NULL;
+#endif
+  }
+
+  // Report 1 for thrown, 0 for closed.
+  void DualVpinTurnout::print(Print *stream) {
+    StringFormatter::send(stream, F("<H %d DUALVPIN %d %d %d>\n"), _turnoutData.id, _dualVpinTurnoutData.vpin_close, _dualVpinTurnoutData.vpin_throw,
+      !_turnoutData.closed); 
+  }
+
+  bool DualVpinTurnout::setClosedInternal(bool close) {
+    if (close) {
+      IODevice::write(_dualVpinTurnoutData.vpin_throw, LOW);
+      IODevice::write(_dualVpinTurnoutData.vpin_close, HIGH);
+      delay(PULSE); // todo: un-block?
+      IODevice::write(_dualVpinTurnoutData.vpin_close, LOW);
+    } else {
+      IODevice::write(_dualVpinTurnoutData.vpin_close, LOW);
+      IODevice::write(_dualVpinTurnoutData.vpin_throw, HIGH);
+      delay(PULSE); // todo: un-block?
+      IODevice::write(_dualVpinTurnoutData.vpin_throw, LOW);
+    }
+    return true;
+  }
+
+  void DualVpinTurnout::save() {
+#ifndef DISABLE_EEPROM
+    // Write turnout definition and current position to EEPROM
+    // First write common servo data, then
+    // write the servo-specific data
+    EEPROM.put(EEStore::pointer(), _turnoutData);
+    EEStore::advance(sizeof(_turnoutData));
+    EEPROM.put(EEStore::pointer(), _dualVpinTurnoutData);
+    EEStore::advance(sizeof(_dualVpinTurnoutData));
+#endif
+  }
+
+
+/*************************************************************************************
  * LCNTurnout - Turnout controlled by Loconet
  * 
  *************************************************************************************/

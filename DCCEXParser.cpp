@@ -910,6 +910,7 @@ bool DCCEXParser::parseT(Print *stream, int16_t params, int16_t p[])
         }
 
     default: // Anything else is some kind of turnout create function.
+      // TODO: parse dual VPIN turnout
       if (params == 6 && p[1] == HASH_KEYWORD_SERVO) { // <T id SERVO n n n n>
         if (!ServoTurnout::create(p[0], (VPIN)p[2], (uint16_t)p[3], (uint16_t)p[4], (uint8_t)p[5]))
           return false;

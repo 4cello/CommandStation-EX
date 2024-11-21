@@ -37,6 +37,7 @@ enum {
   TURNOUT_SERVO = 2,
   TURNOUT_VPIN = 3,
   TURNOUT_LCN = 4,
+  TURNOUT_DUALVPIN = 5,
 };
 
 /*************************************************************************************
@@ -284,6 +285,39 @@ protected:
 
 };
 
+
+/*************************************************************************************
+ * DualVpinTurnout - Turnout controlled through two HAL vpins, one for "close" and
+ *    one for "throw". To change the state, the corresponding pin is pulsed for a
+ *    short time, according to DUAL_TURNOUT_PULSE
+ *************************************************************************************/
+class DualVpinTurnout : public Turnout {
+private:
+  // VpinTurnoutData contains data specific to this subclass that is 
+  // written to EEPROM when the turnout is saved.
+  struct DualVpinTurnoutData {
+    VPIN vpin_close;
+    VPIN vpin_throw;
+  } _dualVpinTurnoutData; // 4 bytes
+
+  static const unsigned long PULSE = 20;
+
+  // Constructor
+ DualVpinTurnout(uint16_t id, VPIN vpin_close, VPIN vpin_throw, bool closed);
+
+public:
+  // Create function
+  static Turnout *create(uint16_t id, VPIN vpin_close, VPIN vpin_throw, bool closed=true);
+
+  // Load a DualVPIN turnout definition from EEPROM.  The common Turnout data has already been read at this point.
+  static Turnout *load(struct TurnoutData *turnoutData);
+  void print(Print *stream) override;
+
+protected:
+  bool setClosedInternal(bool close) override;
+  void save() override;
+
+};
 
 /*************************************************************************************
  * LCNTurnout - Turnout controlled by Loconet
